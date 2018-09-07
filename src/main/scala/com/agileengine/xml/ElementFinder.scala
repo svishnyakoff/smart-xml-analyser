@@ -16,20 +16,16 @@ object ElementFinder extends App with LazyLogging {
 
   // Jsoup requires an absolute file path to resolve possible relative paths in HTML,
   // so providing InputStream through classpath resources is not a case
-  val htmlFile = new File(getClass.getResource("/sample-0-origin.html").getFile);
-//  val candidateFile = new File(getClass.getResource("/startbootstrap-sb-admin-2-examples/sample-1-evil-gemini.html").getFile);
-//  val candidateFile = new File(getClass.getResource("/startbootstrap-sb-admin-2-examples/sample-2-container-and-clone.html").getFile);
-//  val candidateFile = new File(getClass.getResource("/startbootstrap-sb-admin-2-examples/sample-3-the-escape.html").getFile);
-  val candidateFile = new File(getClass.getResource("/startbootstrap-sb-admin-2-examples/sample-4-the-mash.html").getFile);
-  val targetElementId = "make-everything-ok-button"
+  val htmlFile = new File(args(0))
+  val candidateFile = new File(args(1))
+  val targetElementId = if (args.length > 2) args(2) else "make-everything-ok-button"
 
   private val targetElement = findElementById(htmlFile, targetElementId).map {ElementMetadataParser.parseMetadata}
   private val document = parseHtmlFile(candidateFile)
 
   val winner = findSimilarElement(targetElement.get, document)
 
-
-
+  logger.info("Path to target element: {}", getElementPath(winner))
 
   def findElementById(htmlFile: File, targetElementId: String): Option[Element] = Try {
     Jsoup.parse(htmlFile, CHARSET_NAME, htmlFile.getAbsolutePath)
@@ -39,16 +35,41 @@ object ElementFinder extends App with LazyLogging {
     Jsoup.parse(htmlFile, CHARSET_NAME, htmlFile.getAbsolutePath)
   }
 
+  def getElementPath(element: Element): String = {
+    var currentElement = element
+    val root = element.root()
+
+    var pathArray = List.newBuilder[String]
+
+    do {
+      val current = currentElement
+
+      currentElement = currentElement.parent()
+
+      val nodes = currentElement.childNodes().filter(current.tagName() == _.nodeName())
+      if (nodes.size > 1) {
+        val tagName = current.tagName()
+        val indexOfChildElement = nodes.indexOf(current)
+        pathArray += s"$tagName[$indexOfChildElement]"
+      }
+      else {
+        pathArray += currentElement.tagName()
+      }
+
+    } while (currentElement != root)
+
+    pathArray.result().reverse.mkString(" > ")
+  }
+
   def findSimilarElement(originalElement: ElementMetadata, document: Document): Element = {
     val allElements = document.getAllElements
     var elementsScores = new TreeMap[Int, Element]()
-
 
     allElements.listIterator()
     allElements.foreach(element => {
       val candidate = ElementMetadataParser.parseMetadata(element)
       val score = calculateSimilarityScore(originalElement, candidate)
-      logger.info("Element {} has score {}", element, score)
+      logger.info("Element with score {}: {} ({})", score, element.tagName(), element.attributes().toString.trim)
       elementsScores += (score -> element)
     })
 
