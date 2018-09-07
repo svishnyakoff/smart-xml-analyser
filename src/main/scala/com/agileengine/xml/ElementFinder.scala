@@ -2,6 +2,7 @@ package com.agileengine.xml
 
 import java.io.File
 
+import com.agileengine.xml.matcher.ElementMatcher
 import com.typesafe.scalalogging.LazyLogging
 import org.jsoup.Jsoup
 import org.jsoup.nodes.{Document, Element}
@@ -20,7 +21,7 @@ object ElementFinder extends App with LazyLogging {
   val candidateFile = new File(args(1))
   val targetElementId = if (args.length > 2) args(2) else "make-everything-ok-button"
 
-  private val targetElement = findElementById(htmlFile, targetElementId).map {ElementMetadataParser.parseMetadata}
+  private val targetElement = findElementById(htmlFile, targetElementId)
   private val document = parseHtmlFile(candidateFile)
 
   val winner = findSimilarElement(targetElement.get, document)
@@ -61,14 +62,13 @@ object ElementFinder extends App with LazyLogging {
     pathArray.result().reverse.mkString(" > ")
   }
 
-  def findSimilarElement(originalElement: ElementMetadata, document: Document): Element = {
+  def findSimilarElement(originalElement: Element, document: Document): Element = {
     val allElements = document.getAllElements
     var elementsScores = new TreeMap[Int, Element]()
 
     allElements.listIterator()
     allElements.foreach(element => {
-      val candidate = ElementMetadataParser.parseMetadata(element)
-      val score = calculateSimilarityScore(originalElement, candidate)
+      val score = calculateSimilarityScore(originalElement, element)
       logger.info("Element with score {}: {} ({})", score, element.tagName(), element.attributes().toString.trim)
       elementsScores += (score -> element)
     })
@@ -77,35 +77,7 @@ object ElementFinder extends App with LazyLogging {
     elementsScores.last._2
   }
 
-  def calculateSimilarityScore(originElement: ElementMetadata, candidate: ElementMetadata): Int = {
-    val sameTagScore = 10
-    val sameClassScore = 2
-    val sameAttributeNameScore = 1
-    val sameAttributeValueScore = 2
-    val sameTextTokenScore = 1
-
-    var score = 0
-
-    if (originElement.tagName == candidate.tagName) {
-      score += sameTagScore
-    }
-
-    val countSameClasses = originElement.classes.intersect(candidate.classes).size
-    score += (countSameClasses * sameClassScore)
-
-    val countSameAttributeName = originElement.attributes.map(_.getKey).intersect(candidate.attributes.map(_.getKey)).length
-    score += (countSameAttributeName * sameAttributeNameScore)
-
-    val countSameAttribute = originElement.attributes.intersect(candidate.attributes).length
-    score += (countSameAttribute * sameAttributeValueScore)
-
-    if (originElement.hasText == candidate.hasText) {
-      score += 1
-    }
-
-    val countSameTextToken = originElement.textTokens.intersect(candidate.textTokens).length;
-    score += (countSameTextToken * sameTextTokenScore)
-
-    return score
+  def calculateSimilarityScore(originElement: Element, candidate: Element): Int = {
+    ElementMatcher.matchers.map(_.similarityScore(originElement, candidate)).sum
   }
 }
