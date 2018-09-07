@@ -20,7 +20,9 @@ lazy val xml_parsing_snippets = (project in file(".")).
     //util dependencies
     libraryDependencies ++= Seq(
       "org.jsoup" % "jsoup" % "1.11.2",
-      "com.typesafe.scala-logging" %% "scala-logging" % "3.8.0"
+      "com.typesafe.scala-logging" %% "scala-logging" % "3.8.0",
+      "org.slf4j" % "slf4j-api" % "1.7.25",
+      "ch.qos.logback" % "logback-classic" % "1.2.3"
     ),
 
     fork in Test := true,
